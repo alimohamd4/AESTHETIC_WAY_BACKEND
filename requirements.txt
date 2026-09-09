@@ -1,0 +1,54 @@
+# ============================================================
+# AESTHETIC WAY Backend -- requirements.txt
+# Phase 1: Core infrastructure
+# Python 3.13 / Django 5.2 LTS
+# ============================================================
+
+# --- Core ---
+Django==5.2.4
+djangorestframework==3.15.2
+django-filter==24.3
+
+# --- Auth ---
+djangorestframework-simplejwt==5.3.1
+
+# --- CORS ---
+django-cors-headers==4.4.0
+
+# --- Database (PostgreSQL) ---
+psycopg[binary]==3.2.4
+
+# --- Cache / Queue ---
+django-redis==5.4.0
+celery==5.4.0
+redis==5.2.1
+
+# --- Object Storage ---
+django-storages[s3]==1.14.4
+boto3==1.35.73
+
+# --- API Documentation ---
+drf-spectacular==0.27.2
+
+# --- Phone number validation ---
+phonenumbers==8.13.50
+
+# --- Utilities ---
+python-decouple==3.8
+Pillow==11.0.0
+argon2-cffi==23.1.0
+
+# --- Production WSGI ---
+gunicorn==23.0.0
+
+# ============================================================
+# Development / Test dependencies
+# ============================================================
+pytest==8.3.4
+pytest-django==4.9.0
+pytest-cov==6.0.0
+factory-boy==3.3.1
+Faker==33.3.0
+
+# --- Linting ---
+ruff==0.8.4
