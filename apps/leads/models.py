@@ -1,7 +1,9 @@
-import uuid
 import random
-from django.db import models
+import uuid
+
 from django.conf import settings
+from django.db import models
+
 
 class LeadStatus(models.TextChoices):
     NEW = "new", "New"
@@ -23,7 +25,7 @@ def generate_reference_code():
 
 class Lead(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
     # Optional patient auth (null for guests)
     patient = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -43,6 +45,9 @@ class Lead(models.Model):
     practitioner = models.ForeignKey(
         "practitioners.Practitioner", on_delete=models.SET_NULL, null=True, blank=True, related_name="leads"
     )
+    treatment = models.ForeignKey(
+        "treatments.Treatment", on_delete=models.SET_NULL, null=True, blank=True, related_name="leads"
+    )
     offer = models.ForeignKey(
         "offers.Offer", on_delete=models.SET_NULL, null=True, blank=True, related_name="leads"
     )
@@ -54,22 +59,22 @@ class Lead(models.Model):
     reference_code = models.CharField(max_length=20, unique=True, default=generate_reference_code)
     lead_type = models.CharField(max_length=30, choices=LeadType.choices, default=LeadType.CONSULTATION)
     service_name = models.CharField(max_length=200, blank=True, default="")
-    
+
     # Patient details
     patient_name = models.CharField(max_length=200)
     patient_phone = models.CharField(max_length=20)
     patient_email = models.EmailField(blank=True, default="")
-    
+
     preferred_time_window = models.CharField(
         max_length=20, choices=PreferredTimeWindow.choices, blank=True, default=""
     )
     notes = models.TextField(blank=True, default="")
     consent_accepted = models.BooleanField(default=False)
-    
+
     status = models.CharField(
         max_length=20, choices=LeadStatus.choices, default=LeadStatus.NEW, db_index=True
     )
-    
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -1,7 +1,7 @@
 """
 Custom DRF throttle classes for AESTHETIC WAY API.
 """
-from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
+from rest_framework.throttling import AnonRateThrottle
 
 
 class LoginRateThrottle(AnonRateThrottle):

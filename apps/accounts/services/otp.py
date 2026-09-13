@@ -19,13 +19,10 @@ Redis key schema:
   otp_locked:{phone}:{purpose}   ? 1 (TTL=30min � lockout sentinel)
   otp_ip_attempts:{ip}           ? int (TTL=3600s)
 """
-import hashlib
 import hmac
 import logging
 import time
-from datetime import datetime, timedelta, timezone
 
-from django.conf import settings
 from django.core.cache import cache
 
 from apps.accounts.services.sms import get_sms_provider
@@ -194,7 +191,7 @@ class OtpService:
             expires_at = int(expires_at_str)
         except (ValueError, AttributeError):
             cache.delete(otp_key)
-            raise OtpExpiredError("OTP state corrupted. Please request a new one.")
+            raise OtpExpiredError("OTP state corrupted. Please request a new one.") from None
 
         # Check expiry (Redis TTL is the primary guard; this is belt-and-suspenders)
         if int(time.time()) > expires_at:
@@ -219,7 +216,7 @@ class OtpService:
                 cache.set(_locked_key(phone, purpose), 1, timeout=OTP_LOCKOUT_SECONDS)
                 cache.delete(otp_key)
                 raise OtpLockedError(
-                    f"Too many failed attempts. Account locked for 30 minutes."
+                    "Too many failed attempts. Account locked for 30 minutes."
                 )
 
             remaining = OTP_MAX_ATTEMPTS - new_attempts
@@ -250,6 +247,7 @@ class OtpService:
         """
         try:
             from datetime import datetime, timezone
+
             from apps.accounts.models import OtpRecord
             expires_dt = datetime.fromtimestamp(expires_at, tz=timezone.utc)
             OtpRecord.objects.create(

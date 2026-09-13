@@ -1,5 +1,6 @@
 from django.urls import path
-from apps.referrals.views.patient_views import ReferralStatusAPIView, CollectCodeAPIView
+
+from apps.referrals.views.patient_views import CollectCodeAPIView, ReferralStatusAPIView
 
 app_name = "referrals"
 

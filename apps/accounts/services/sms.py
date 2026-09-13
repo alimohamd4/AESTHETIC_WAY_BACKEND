@@ -45,8 +45,6 @@ class ConsoleSmsProvider(BaseSmsProvider):
             f"\n[DEV SMS] OTP for {phone} ({purpose}): {code}" +
             "\n" + "=" * 60
         )
-        # Also print to stdout so it is visible in test output
-        print(f"\n[DEV SMS] OTP ? {phone} ({purpose}): {code}\n")
         return True
 
 

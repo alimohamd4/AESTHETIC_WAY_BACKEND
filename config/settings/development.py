@@ -1,6 +1,8 @@
 """
 AESTHETIC WAY Backend - Development Settings
 """
+import os
+
 from .base import *  # noqa: F401, F403
 
 DEBUG = True
@@ -12,7 +14,6 @@ CORS_ALLOW_ALL_ORIGINS = True
 
 # Development database (SQLite for fast local dev without PostGIS)
 # Switch to PostgreSQL when Docker is running
-import os
 USE_POSTGIS = os.environ.get("USE_POSTGIS", "false").lower() == "true"
 
 if USE_POSTGIS:

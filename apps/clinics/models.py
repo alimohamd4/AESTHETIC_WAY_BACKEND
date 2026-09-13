@@ -69,10 +69,14 @@ class Clinic(models.Model):
         max_digits=10, decimal_places=7, null=True, blank=True
     )
 
+    # Maps fields
+    google_place_id = models.CharField(max_length=255, blank=True, default="")
+    google_maps_url = models.URLField(blank=True, default="")
+
     # Media
     logo = models.URLField(blank=True, default="")
     cover_image = models.URLField(blank=True, default="")
-    
+
     # Rating
     google_rating = models.DecimalField(
         max_digits=3, decimal_places=2, null=True, blank=True
@@ -164,6 +168,8 @@ class ClinicBranch(models.Model):
     longitude = models.DecimalField(
         max_digits=10, decimal_places=7, null=True, blank=True
     )
+    google_place_id = models.CharField(max_length=255, blank=True, default="")
+    google_maps_url = models.URLField(blank=True, default="")
     is_main_branch = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

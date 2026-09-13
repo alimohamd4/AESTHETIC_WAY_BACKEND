@@ -4,7 +4,6 @@ Handles registration, login, OTP, password reset, and profile.
 """
 import logging
 
-
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -20,7 +19,14 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """
     Custom JWT token pair serializer.
     Adds user claims to the JWT payload: role, clinic_id, is_verified.
+    Accepts 'identifier' (phone or email per spec §5.1) or backward-compatible 'phone'.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.username_field in self.fields:
+            self.fields[self.username_field].required = False
+        self.fields["identifier"] = serializers.CharField(required=False, write_only=True)
 
     @classmethod
     def get_token(cls, user):
@@ -30,7 +36,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token["is_verified"] = user.is_verified
         token["full_name"] = user.full_name
 
-        # Add clinic_id for clinic users (routing hint � NOT the auth check)
+        # Add clinic_id for clinic users (routing hint — NOT the auth check)
         clinic_id = None
         if user.role in (UserRole.CLINIC_STAFF, UserRole.CLINIC_ADMIN):
             membership = user.clinic_memberships.filter(is_active=True).first()
@@ -41,22 +47,39 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
-        # Accept phone or email as identifier
-        identifier = attrs.get(self.username_field, "")
+        # Accept 'identifier' (phone or email) per spec §5.1 or backward-compatible 'phone'
+        identifier = attrs.get("identifier") or attrs.get(self.username_field, "")
+        if not identifier:
+            raise serializers.ValidationError(
+                {"identifier": "Phone number or email is required."},
+                code="required",
+            )
         password = attrs.get("password", "")
+        if not password:
+            raise serializers.ValidationError(
+                {"password": "Password is required."},
+                code="required",
+            )
+
+        identifier = str(identifier).strip()
 
         # Resolve identifier to User object
         user = None
         if "@" in identifier:
             try:
-                candidate = User.objects.get(email=identifier, deleted_at__isnull=True)
+                candidate = User.objects.get(email__iexact=identifier, deleted_at__isnull=True)
                 if candidate.check_password(password):
                     user = candidate
             except User.DoesNotExist:
                 pass
         else:
             try:
-                candidate = User.objects.get(phone=identifier, deleted_at__isnull=True)
+                normalized = normalize_phone(identifier)
+            except ValueError:
+                normalized = identifier
+
+            try:
+                candidate = User.objects.get(phone=normalized, deleted_at__isnull=True)
                 if candidate.check_password(password):
                     user = candidate
             except User.DoesNotExist:
@@ -85,8 +108,6 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         # Generate JWT tokens directly (do NOT call super().validate() — it would re-authenticate
         # via ModelBackend which doesn't support our custom phone/email lookup)
         from rest_framework_simplejwt.tokens import RefreshToken
-        refresh = RefreshToken.for_user(user)
-        # Add custom claims via get_token
         refresh = self.__class__.get_token(user)
 
         data = {
@@ -156,9 +177,12 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
             role=UserRole.PATIENT,
             **validated_data,
         )
-        # Store referral code for post-OTP processing
+        # Persist referral code on PatientProfile for post-OTP milestone processing
         if referral_code:
-            user._pending_referral_code = referral_code
+            profile = getattr(user, "patient_profile", None)
+            if profile:
+                profile.referred_by_code = referral_code
+                profile.save(update_fields=["referred_by_code"])
         return user
 
 

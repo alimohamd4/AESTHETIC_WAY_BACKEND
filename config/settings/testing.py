@@ -2,9 +2,12 @@
 AESTHETIC WAY Backend - Test Settings
 Uses SQLite for speed; no Redis/Celery required.
 """
+import tempfile
+
 from .base import *  # noqa: F401, F403
 
 DEBUG = True
+
 
 DATABASES = {
     "default": {
@@ -46,3 +49,6 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
 }
+
+MEDIA_ROOT = tempfile.mkdtemp(prefix="aw_test_media_")
+

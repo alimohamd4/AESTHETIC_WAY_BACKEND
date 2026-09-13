@@ -1,6 +1,8 @@
 import logging
+
 from celery import shared_task
 from django.utils import timezone
+
 from apps.notifications.service import get_notification_provider
 
 logger = logging.getLogger(__name__)

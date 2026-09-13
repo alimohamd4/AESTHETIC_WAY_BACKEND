@@ -1,10 +1,12 @@
-import uuid
 import random
 import string
-from django.db import models
-from django.conf import settings
-from django.utils import timezone
+import uuid
 from datetime import timedelta
+
+from django.conf import settings
+from django.db import models
+from django.utils import timezone
+
 
 class ReferralInviteStatus(models.TextChoices):
     PENDING = "pending", "Pending"
@@ -19,8 +21,8 @@ class LedgerTransactionType(models.TextChoices):
     ADMIN_ADJUSTMENT = "admin_adjustment", "Admin Adjustment"
 
 class DiscountCodeStatus(models.TextChoices):
-    ACTIVE = "active", "Active"
-    REDEEMED = "redeemed", "Redeemed"
+    AVAILABLE = "available", "Available"
+    USED = "used", "Used"
     EXPIRED = "expired", "Expired"
 
 def generate_discount_code():
@@ -50,7 +52,7 @@ class ReferralInvite(models.Model):
 
 class ReferralPointsLedger(models.Model):
     """
-    Immutable ledger of points. 
+    Immutable ledger of points.
     Source of truth for patient points balance.
     """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
@@ -76,8 +78,9 @@ class ReferralDiscountCode(models.Model):
     )
     code = models.CharField(max_length=20, unique=True, default=generate_discount_code)
     status = models.CharField(
-        max_length=20, choices=DiscountCodeStatus.choices, default=DiscountCodeStatus.ACTIVE
+        max_length=20, choices=DiscountCodeStatus.choices, default=DiscountCodeStatus.AVAILABLE
     )
+    discount_percent = models.PositiveSmallIntegerField(default=15)
     redeemed_at = models.DateTimeField(null=True, blank=True)
     redeemed_clinic = models.ForeignKey(
         "clinics.Clinic", on_delete=models.SET_NULL, null=True, blank=True, related_name="redeemed_codes"

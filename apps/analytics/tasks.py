@@ -1,7 +1,8 @@
 import logging
+from datetime import timedelta
+
 from celery import shared_task
 from django.utils import timezone
-from datetime import timedelta, date
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ def analytics_daily_rollup():
     Running twice on the same date simply overwrites with the same result.
     """
     from django.core.cache import cache
+
     from apps.analytics.models import AnalyticsEvent
 
     yesterday = (timezone.now() - timedelta(days=1)).date()

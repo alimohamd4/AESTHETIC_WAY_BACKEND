@@ -1,6 +1,4 @@
 from django.conf import settings
-from apps.notifications.providers.console_provider import ConsoleProvider
-from apps.notifications.providers.mock_provider import MockProvider
 
 
 def get_notification_provider():
@@ -39,8 +37,8 @@ class NotificationService:
 
     @staticmethod
     def send_async(recipient, notification_type, payload: dict, channel="push"):
-        from apps.notifications.models import Notification, NotificationStatus
         from apps.notifications import tasks as _notification_tasks
+        from apps.notifications.models import Notification, NotificationStatus
         deliver_notification = _notification_tasks.deliver_notification
 
         notification = Notification.objects.create(
@@ -53,7 +51,7 @@ class NotificationService:
 
         # Dispatch async — this call must NOT block or raise
         try:
-            deliver_notification.delay(str(notification.id))
+            deliver_notification.apply_async(args=[str(notification.id)], retry=False)
         except Exception:
             # If Celery/Redis is down, the notification stays pending.
             # A periodic beat task can later sweep pending records.

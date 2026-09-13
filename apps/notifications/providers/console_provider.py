@@ -1,4 +1,5 @@
 import logging
+
 from apps.notifications.providers.base import BaseNotificationProvider
 
 logger = logging.getLogger(__name__)

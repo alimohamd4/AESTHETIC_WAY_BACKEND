@@ -1,6 +1,8 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 
 class EventType(models.TextChoices):
     APP_OPEN = "app_open", "App Open"
@@ -12,24 +14,24 @@ class EventType(models.TextChoices):
 
 class AnalyticsEvent(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    
+
     event_type = models.CharField(max_length=50, choices=EventType.choices)
-    
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
     )
     anonymous_id = models.CharField(max_length=255, null=True, blank=True)
-    
+
     clinic = models.ForeignKey(
         "clinics.Clinic", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="analytics_events"
     )
-    
+
     object_type = models.CharField(max_length=100, null=True, blank=True)
     object_id = models.UUIDField(null=True, blank=True)
-    
+
     metadata = models.JSONField(default=dict, blank=True)
-    
+
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:

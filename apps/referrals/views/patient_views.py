@@ -1,13 +1,15 @@
-from rest_framework import generics, status
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from rest_framework.views import APIView
 from django.db import transaction
 from django.db.models import Sum
+from drf_spectacular.utils import OpenApiResponse, extend_schema
+from rest_framework import generics, status
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.accounts.models import PatientProfile
-from apps.referrals.models import ReferralDiscountCode, ReferralPointsLedger, LedgerTransactionType
+from apps.referrals.models import LedgerTransactionType, ReferralDiscountCode, ReferralPointsLedger
 from apps.referrals.serializers import PatientStatusSerializer
+
 
 class ReferralStatusAPIView(generics.RetrieveAPIView):
     """
@@ -18,12 +20,21 @@ class ReferralStatusAPIView(generics.RetrieveAPIView):
 
     def get_object(self):
         profile = PatientProfile.objects.get(user=self.request.user)
-        # We can dynamically pass the related codes
         codes = ReferralDiscountCode.objects.filter(patient=self.request.user)
-        
+
         return {
-            "current_points": profile.current_points,
+            "referral_code": profile.referral_code,
+            "successful_invites_count": profile.total_successful_invites,
             "total_successful_invites": profile.total_successful_invites,
+            "current_points": profile.current_points,
+            "points_to_collect": 500,
+            "can_collect_code": profile.current_points >= 500,
+            "points_expire": False,
+            "milestones": {
+                "20": profile.milestone_20_awarded,
+                "35": profile.milestone_35_awarded,
+                "50": profile.milestone_50_awarded,
+            },
             "discount_codes": codes
         }
 
@@ -34,6 +45,24 @@ class CollectCodeAPIView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            201: OpenApiResponse(
+                description="Discount code successfully generated",
+                response={
+                    "type": "object",
+                    "properties": {
+                        "success": {"type": "boolean"},
+                        "code": {"type": "string"},
+                        "expires_at": {"type": "string", "format": "date-time"},
+                        "remaining_points": {"type": "integer"},
+                    },
+                },
+            ),
+            400: OpenApiResponse(description="Insufficient points"),
+        },
+    )
     def post(self, request, *args, **kwargs):
         patient = request.user
         code = None
@@ -66,8 +95,8 @@ class CollectCodeAPIView(APIView):
             code = ReferralDiscountCode.objects.create(patient=patient)
 
         # --- Notification (fire-and-forget, outside the transaction) ---
-        from apps.notifications.service import NotificationService
         from apps.notifications.models import NotificationType
+        from apps.notifications.service import NotificationService
 
         NotificationService.send_async(
             recipient=patient,

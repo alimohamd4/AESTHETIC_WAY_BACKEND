@@ -3,10 +3,9 @@ Root conftest.py for AESTHETIC WAY test suite.
 Provides shared fixtures used across all test modules.
 """
 import pytest
-from django.test import override_settings
 from rest_framework.test import APIClient
 
-from apps.accounts.models import ClinicUser, PatientProfile, User, UserRole
+from apps.accounts.models import ClinicUser, User, UserRole
 from apps.accounts.services.sms import MockSmsProvider
 from apps.clinics.models import Clinic
 

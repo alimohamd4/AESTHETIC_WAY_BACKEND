@@ -20,9 +20,8 @@ Security:
 """
 import logging
 
-from django.contrib.auth import update_session_auth_hash
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import generics, permissions, serializers, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -42,11 +41,6 @@ from .serializers import (
 )
 from .services.otp import (
     OtpError,
-    OtpExpiredError,
-    OtpInvalidError,
-    OtpIpLimitError,
-    OtpLockedError,
-    OtpNotFoundError,
     OtpRateLimitError,
     OtpService,
 )
@@ -89,6 +83,7 @@ def _otp_error_response(exc: OtpError) -> Response:
         "Creates a patient account and sends an OTP to the provided phone number. "
         "The account is not usable until OTP verification is complete."
     ),
+    request=UserRegistrationSerializer,
     responses={
         201: OpenApiResponse(description="Account created; OTP sent"),
         422: OpenApiResponse(description="Validation error"),
@@ -106,7 +101,6 @@ class RegisterView(APIView):
         serializer.is_valid(raise_exception=True)
 
         user = serializer.save()
-        pending_referral = getattr(user, "_pending_referral_code", None)
 
         # Send OTP
         try:
@@ -145,10 +139,7 @@ class LoginView(TokenObtainPairView):
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
-        try:
-            serializer.is_valid(raise_exception=True)
-        except Exception:
-            raise
+        serializer.is_valid(raise_exception=True)
 
         user = serializer.user
         # Update last login
@@ -172,9 +163,11 @@ class LoginView(TokenObtainPairView):
     tags=["Auth"],
     summary="Verify OTP code",
     description=(
-        "Verifies the OTP sent to the user''s phone. "
-        "On success for ''registration'' purpose, marks the account as verified and returns JWT tokens."
+        "Verifies the OTP sent to the user's phone. "
+        "On success for 'registration' purpose, marks the account as verified and returns JWT tokens."
     ),
+    request=OtpVerifySerializer,
+    responses={200: OpenApiResponse(description="OTP verified successfully")},
 )
 class VerifyOtpView(APIView):
     """POST /auth/verify-otp/"""
@@ -255,15 +248,86 @@ def _add_custom_claims(token: RefreshToken, user: User) -> None:
 def _process_referral_invite(user: User) -> None:
     """
     Record a referral invite if the user registered with a referral code.
-    The code is stored in their PatientProfile.referral_code note during registration.
-    (Full referral reward logic is implemented in Phase 4.)
+    Called strictly AFTER successful OTP phone verification.
+    Guarantees:
+    - Transaction safety via select_for_update() and transaction.atomic().
+    - Strict idempotency: re-running does not increment invites or duplicate awards.
+    - Self-referral prevention.
+    - Evaluates milestone points engine.
     """
-    pass  # Phase 4 implementation
+    from django.db import transaction
+    from django.db.models import F
+
+    from apps.accounts.models import PatientProfile
+    from apps.referrals.models import ReferralInvite, ReferralInviteStatus
+    from apps.referrals.services import award_referral_milestones
+
+    try:
+        profile = getattr(user, "patient_profile", None)
+        if not profile:
+            profile = PatientProfile.objects.filter(user=user).first()
+        if not profile or not profile.referred_by_code:
+            return
+
+        referred_by_code = profile.referred_by_code.strip()
+
+        # Guard against self-referral
+        if referred_by_code == profile.referral_code:
+            logger.warning("Self-referral attempt detected for user %s with code %s", user.id, referred_by_code)
+            return
+
+        awarded = False
+        with transaction.atomic():
+            # Lock referrer profile
+            referrer_profile = (
+                PatientProfile.objects.select_for_update()
+                .filter(referral_code=referred_by_code)
+                .first()
+            )
+            if not referrer_profile or referrer_profile.user_id == user.id:
+                return
+
+            invite, created = ReferralInvite.objects.select_for_update().get_or_create(
+                referrer=referrer_profile.user,
+                invitee_phone=user.phone,
+                defaults={"status": ReferralInviteStatus.SUCCESSFUL},
+            )
+
+            if created:
+                # Newly created invite directly as successful
+                referrer_profile.total_successful_invites = F("total_successful_invites") + 1
+                referrer_profile.save(update_fields=["total_successful_invites"])
+                awarded = True
+            elif invite.status != ReferralInviteStatus.SUCCESSFUL:
+                # Transitioning existing pending invite to successful
+                invite.status = ReferralInviteStatus.SUCCESSFUL
+                invite.save(update_fields=["status", "updated_at"])
+                referrer_profile.total_successful_invites = F("total_successful_invites") + 1
+                referrer_profile.save(update_fields=["total_successful_invites"])
+                awarded = True
+
+        # Outside atomic transaction: evaluate milestone engine if an invite was awarded
+        if awarded:
+            referrer_profile.refresh_from_db()
+            award_referral_milestones(referrer_profile.user)
+            logger.info(
+                "Referral invite processed: Referrer %s now has %d invites",
+                referrer_profile.user_id,
+                referrer_profile.total_successful_invites,
+            )
+
+    except Exception as exc:
+        logger.error("Failed to process referral invite for user %s: %s", user.id, exc)
 
 
 # --- OTP Resend ----------------------------------------------------------------
 
-@extend_schema(tags=["Auth"], summary="Resend OTP")
+@extend_schema(
+    tags=["Auth"],
+    summary="Resend OTP",
+    request=OtpResendSerializer,
+    responses={200: OpenApiResponse(description="OTP resent successfully")},
+)
 class ResendOtpView(APIView):
     """POST /auth/resend-otp/"""
 
@@ -294,7 +358,12 @@ class ResendOtpView(APIView):
 
 # --- Forgot Password -----------------------------------------------------------
 
-@extend_schema(tags=["Auth"], summary="Request password reset OTP")
+@extend_schema(
+    tags=["Auth"],
+    summary="Request password reset OTP",
+    request=ForgotPasswordSerializer,
+    responses={200: OpenApiResponse(description="Password reset OTP sent")},
+)
 class ForgotPasswordView(APIView):
     """POST /auth/forgot-password/"""
 
@@ -320,7 +389,12 @@ class ForgotPasswordView(APIView):
 
 # --- Reset Password ------------------------------------------------------------
 
-@extend_schema(tags=["Auth"], summary="Reset password using OTP")
+@extend_schema(
+    tags=["Auth"],
+    summary="Reset password using OTP",
+    request=ResetPasswordSerializer,
+    responses={200: OpenApiResponse(description="Password reset successfully")},
+)
 class ResetPasswordView(APIView):
     """POST /auth/reset-password/"""
 
@@ -385,9 +459,14 @@ class RefreshView(TokenRefreshView):
 
 # --- Logout --------------------------------------------------------------------
 
-@extend_schema(tags=["Auth"], summary="Logout � blacklist refresh token")
+@extend_schema(
+    tags=["Auth"],
+    summary="Logout – blacklist refresh token",
+    request=inline_serializer("LogoutRequest", fields={"refresh_token": serializers.CharField()}),
+    responses={204: None, 400: OpenApiResponse(description="Invalid or missing token")},
+)
 class LogoutView(APIView):
-    """POST /auth/logout/ � Blacklists the provided refresh token."""
+    """POST /auth/logout/  Blacklists the provided refresh token."""
 
     permission_classes = [permissions.IsAuthenticated]
 

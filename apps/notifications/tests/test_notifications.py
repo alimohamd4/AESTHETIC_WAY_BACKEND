@@ -7,17 +7,18 @@ Business-state consistency tests verify that state is committed *before*
 notification records appear, and that a failed notification never rolls
 back business state.
 """
-from unittest.mock import patch, MagicMock
-from django.test import TestCase, override_settings
-from django.contrib.auth import get_user_model
-from django.utils import timezone
 from datetime import timedelta
+from unittest.mock import MagicMock, patch
 
-from apps.accounts.models import UserRole, ClinicUser
+from django.contrib.auth import get_user_model
+from django.test import TestCase, override_settings
+from django.utils import timezone
+
+from apps.accounts.models import UserRole
 from apps.clinics.models import Clinic
-from apps.notifications.models import Notification, NotificationType, NotificationStatus
-from apps.notifications.service import NotificationService
+from apps.notifications.models import Notification, NotificationStatus, NotificationType
 from apps.notifications.providers.mock_provider import MockProvider
+from apps.notifications.service import NotificationService
 
 User = get_user_model()
 
@@ -110,9 +111,8 @@ class NotificationServiceTests(TestCase):
         Lead state (status=new) is committed to the DB even when the
         notification task fails to enqueue (e.g. Redis is down).
         """
-        from apps.leads.models import Lead
 
-        clinic = Clinic.objects.create(name_en="Test Clinic")
+        Clinic.objects.create(name_en="Test Clinic")
 
         with patch("apps.notifications.tasks.deliver_notification") as mock_task:
             mock_task.delay.side_effect = Exception("Redis unavailable")
@@ -174,9 +174,9 @@ class MaintenanceTaskTests(TestCase):
         self.assertEqual(result2.result, 0)  # No rows updated on second run
 
     def test_expire_stale_discount_codes(self):
-        from apps.referrals.models import ReferralDiscountCode, DiscountCodeStatus
-        from apps.referrals.tasks import expire_stale_discount_codes
         from apps.accounts.models import UserRole
+        from apps.referrals.models import DiscountCodeStatus, ReferralDiscountCode
+        from apps.referrals.tasks import expire_stale_discount_codes
 
         patient = User.objects.create_user(phone="+971500000009", full_name="Ref Patient", role=UserRole.PATIENT)
 
@@ -184,13 +184,13 @@ class MaintenanceTaskTests(TestCase):
             patient=patient,
             code="AW-15-STALE",
             expires_at=timezone.now() - timedelta(days=1),
-            status=DiscountCodeStatus.ACTIVE,
+            status=DiscountCodeStatus.AVAILABLE,
         )
         valid_code = ReferralDiscountCode.objects.create(
             patient=patient,
             code="AW-15-VALID",
             expires_at=timezone.now() + timedelta(days=10),
-            status=DiscountCodeStatus.ACTIVE,
+            status=DiscountCodeStatus.AVAILABLE,
         )
 
         result = expire_stale_discount_codes.apply()
@@ -199,7 +199,7 @@ class MaintenanceTaskTests(TestCase):
         stale_code.refresh_from_db()
         valid_code.refresh_from_db()
         self.assertEqual(stale_code.status, DiscountCodeStatus.EXPIRED)
-        self.assertEqual(valid_code.status, DiscountCodeStatus.ACTIVE)
+        self.assertEqual(valid_code.status, DiscountCodeStatus.AVAILABLE)
 
     def test_cleanup_revoked_refresh_tokens(self):
         from core.tasks import cleanup_revoked_refresh_tokens

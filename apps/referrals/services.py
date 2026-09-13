@@ -1,7 +1,8 @@
 from django.db import transaction
 from django.db.models import Sum
-from apps.referrals.models import ReferralPointsLedger, LedgerTransactionType
+
 from apps.accounts.models import PatientProfile
+from apps.referrals.models import LedgerTransactionType, ReferralPointsLedger
 
 
 def award_referral_milestones(patient):
@@ -41,12 +42,24 @@ def award_referral_milestones(patient):
         # Recalculate total points from ledger
         ledger_sum = ReferralPointsLedger.objects.filter(patient=patient).aggregate(Sum("points"))["points__sum"] or 0
         profile.current_points = ledger_sum
-        profile.save(update_fields=["current_points"])
+
+        update_fields = ["current_points"]
+        if invites_count >= 20 and not profile.milestone_20_awarded:
+            profile.milestone_20_awarded = True
+            update_fields.append("milestone_20_awarded")
+        if invites_count >= 35 and not profile.milestone_35_awarded:
+            profile.milestone_35_awarded = True
+            update_fields.append("milestone_35_awarded")
+        if invites_count >= 50 and not profile.milestone_50_awarded:
+            profile.milestone_50_awarded = True
+            update_fields.append("milestone_50_awarded")
+
+        profile.save(update_fields=update_fields)
 
     # --- Notifications (fire-and-forget, outside the transaction) ---
     if newly_awarded:
-        from apps.notifications.service import NotificationService
         from apps.notifications.models import NotificationType
+        from apps.notifications.service import NotificationService
 
         for award in newly_awarded:
             NotificationService.send_async(

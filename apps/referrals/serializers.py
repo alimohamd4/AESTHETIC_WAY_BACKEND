@@ -1,5 +1,7 @@
 from rest_framework import serializers
+
 from apps.referrals.models import ReferralDiscountCode
+
 
 class ReferralDiscountCodeSerializer(serializers.ModelSerializer):
     class Meta:
@@ -8,7 +10,13 @@ class ReferralDiscountCodeSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 class PatientStatusSerializer(serializers.Serializer):
+    referral_code = serializers.CharField(read_only=True)
+    successful_invites_count = serializers.IntegerField(read_only=True)
     current_points = serializers.IntegerField(read_only=True)
+    points_to_collect = serializers.IntegerField(read_only=True, default=500)
+    can_collect_code = serializers.BooleanField(read_only=True)
+    points_expire = serializers.BooleanField(read_only=True, default=False)
+    milestones = serializers.DictField(read_only=True)
     total_successful_invites = serializers.IntegerField(read_only=True)
     discount_codes = ReferralDiscountCodeSerializer(many=True, read_only=True)
 

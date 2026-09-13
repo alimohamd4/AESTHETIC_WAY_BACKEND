@@ -2,7 +2,6 @@
 AESTHETIC WAY Backend - Base Settings
 Shared across all environments.
 """
-import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -60,6 +59,7 @@ MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.locale.LocaleMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -124,7 +124,12 @@ PASSWORD_HASHERS = [
 ]
 
 # --- Internationalization -----------------------------------------------------
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "en"
+LANGUAGES = [
+    ("en", "English"),
+    ("ar", "Arabic"),
+]
+LOCALE_PATHS = [BASE_DIR / "locale"]
 TIME_ZONE = "Asia/Dubai"
 USE_I18N = True
 USE_TZ = True

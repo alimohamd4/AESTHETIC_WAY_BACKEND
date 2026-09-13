@@ -1,4 +1,5 @@
 import logging
+
 from celery import shared_task
 from django.utils import timezone
 
@@ -10,11 +11,11 @@ def expire_stale_discount_codes():
     """
     Idempotent: marks active ReferralDiscountCodes past their expires_at as 'expired'.
     """
-    from apps.referrals.models import ReferralDiscountCode, DiscountCodeStatus
+    from apps.referrals.models import DiscountCodeStatus, ReferralDiscountCode
 
     updated = ReferralDiscountCode.objects.filter(
         expires_at__lt=timezone.now(),
-        status=DiscountCodeStatus.ACTIVE,
+        status=DiscountCodeStatus.AVAILABLE,
     ).update(status=DiscountCodeStatus.EXPIRED)
 
     logger.info("expire_stale_discount_codes: expired %d code(s).", updated)

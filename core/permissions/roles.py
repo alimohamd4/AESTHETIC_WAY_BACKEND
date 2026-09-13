@@ -65,14 +65,18 @@ class IsClinicAdmin(BasePermission):
 
 
 class IsSuperAdmin(BasePermission):
-    """Allows access only to super_admin users."""
+    """
+    Allows access only to super_admin users or Django superusers.
+    """
 
     message = "This action requires a super administrator account."
 
     def has_permission(self, request, view):
-        return (
-            bool(request.user and request.user.is_authenticated)
-            and request.user.role == "super_admin"
+        if not (request.user and request.user.is_authenticated):
+            return False
+        return bool(
+            request.user.role == "super_admin"
+            or getattr(request.user, "is_superuser", False)
         )
 
 

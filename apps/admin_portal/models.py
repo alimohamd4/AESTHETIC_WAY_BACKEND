@@ -1,9 +1,13 @@
 import uuid
-from django.db import models
+
 from django.conf import settings
+from django.db import models
+
 
 class AdminActionType(models.TextChoices):
     SUSPEND_CLINIC = "suspend_clinic", "Suspend Clinic"
+    ACTIVATE_CLINIC = "activate_clinic", "Activate Clinic"
+    VERIFY_CLINIC = "verify_clinic", "Verify Clinic"
     UPDATE_SUBSCRIPTION = "update_subscription", "Update Subscription"
     MODERATE_CONTENT = "moderate_content", "Moderate Content"
     REDEEM_DISCOUNT = "redeem_discount", "Redeem Discount"

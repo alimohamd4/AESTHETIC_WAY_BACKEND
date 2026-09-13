@@ -3,7 +3,6 @@ Utility functions for the accounts app.
 """
 import hashlib
 import hmac
-import random
 import secrets
 import string
 

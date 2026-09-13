@@ -1,9 +1,13 @@
 """
 Celery application configuration for AESTHETIC WAY backend.
 """
+import logging
 import os
+
 from celery import Celery
 from celery.schedules import crontab
+
+logger = logging.getLogger(__name__)
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.development")
 
@@ -20,7 +24,7 @@ app.autodiscover_tasks([
 
 @app.task(bind=True, ignore_result=True)
 def debug_task(self):
-    print(f"Request: {self.request!r}")
+    logger.debug("Request: %r", self.request)
 
 
 app.conf.beat_schedule = {

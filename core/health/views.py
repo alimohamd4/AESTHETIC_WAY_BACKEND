@@ -2,7 +2,7 @@
 Health check endpoint for AESTHETIC WAY API.
 Returns 200 with system status.
 """
-from django.db import connection, OperationalError
+from django.db import OperationalError, connection
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny

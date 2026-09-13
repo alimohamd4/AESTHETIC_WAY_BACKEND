@@ -1,16 +1,21 @@
+
 """
 Comprehensive auth test suite for AESTHETIC WAY.
 """
 import time
+
 import pytest
 from django.core.cache import cache
 from rest_framework import status
 from rest_framework.test import APIClient
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from apps.accounts.models import OtpRecord, PatientProfile, User, UserRole
+from apps.accounts.models import PatientProfile, User, UserRole
 from apps.accounts.services.otp import (
-    OTP_MAX_ATTEMPTS, OTP_TTL_SECONDS, OtpService, _otp_key, _locked_key,
+    OTP_MAX_ATTEMPTS,
+    OTP_TTL_SECONDS,
+    _locked_key,
+    _otp_key,
 )
 from apps.accounts.services.sms import MockSmsProvider
 from apps.accounts.utils import hash_otp
@@ -112,7 +117,8 @@ class TestLogin:
         assert data["user"]["role"] == "patient"
 
     def test_login_with_email_success(self):
-        self.user.email = "ahmed@test.com"; self.user.save()
+        self.user.email = "ahmed@test.com"
+        self.user.save()
         resp = self.client.post(LOGIN_URL, {"phone": "ahmed@test.com", "password": "SecurePass123!"}, format="json")
         assert resp.status_code == status.HTTP_200_OK
 
@@ -125,14 +131,36 @@ class TestLogin:
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
     def test_login_deactivated_user_rejected(self):
-        self.user.is_active = False; self.user.save()
+        self.user.is_active = False
+        self.user.save()
         resp = self.client.post(LOGIN_URL, {"phone": "+971501234567", "password": "SecurePass123!"}, format="json")
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
-    def test_login_jwt_contains_correct_role(self):
-        resp = self.client.post(LOGIN_URL, {"phone": "+971501234567", "password": "SecurePass123!"}, format="json")
+    def test_login_with_identifier_phone_success(self):
+        resp = self.client.post(LOGIN_URL, {"identifier": "+971501234567", "password": "SecurePass123!"}, format="json")
         assert resp.status_code == status.HTTP_200_OK
-        import base64, json
+        data = resp.json()
+        assert "access_token" in data and "refresh_token" in data
+        assert data["token_type"] == "Bearer"
+        assert data["user"]["role"] == "patient"
+
+    def test_login_with_identifier_email_success(self):
+        self.user.email = "ahmed@test.com"
+        self.user.save()
+        resp = self.client.post(LOGIN_URL, {"identifier": "ahmed@test.com", "password": "SecurePass123!"}, format="json")
+        assert resp.status_code == status.HTTP_200_OK
+        data = resp.json()
+        assert data["user"]["email"] == "ahmed@test.com"
+
+    def test_login_missing_identifier_and_phone_rejected(self):
+        resp = self.client.post(LOGIN_URL, {"password": "SecurePass123!"}, format="json")
+        assert resp.status_code == status.HTTP_400_BAD_REQUEST
+
+    def test_login_jwt_contains_correct_role(self):
+        resp = self.client.post(LOGIN_URL, {"identifier": "+971501234567", "password": "SecurePass123!"}, format="json")
+        assert resp.status_code == status.HTTP_200_OK
+        import base64
+        import json
         token = resp.json()["access_token"]
         payload_b64 = token.split(".")[1]
         padding = "=" * (4 - len(payload_b64) % 4)
@@ -236,7 +264,8 @@ class TestForgotPassword:
         assert MockSmsProvider.last_otp("+971508888888") is not None
 
     def test_forgot_password_inactive_user_rejected(self):
-        self.user.is_active = False; self.user.save()
+        self.user.is_active = False
+        self.user.save()
         resp = self.client.post(FORGOT_PASSWORD_URL, {"phone": "+971508888888"}, format="json")
         assert resp.status_code == status.HTTP_400_BAD_REQUEST
 
@@ -312,6 +341,7 @@ class TestJwtAndRefresh:
 
     def test_expired_token_rejected(self):
         from datetime import timedelta
+
         from rest_framework_simplejwt.tokens import AccessToken
         token = AccessToken.for_user(self.user)
         token.set_exp(lifetime=timedelta(seconds=-1))
@@ -392,26 +422,33 @@ class TestMeEndpoint:
 @pytest.mark.django_db
 class TestRolePermissions:
     def test_is_clinic_admin_rejects_staff(self, clinic_staff_user):
-        from core.permissions import IsClinicAdmin
         from unittest.mock import MagicMock
+
+        from core.permissions import IsClinicAdmin
         perm = IsClinicAdmin()
-        req = MagicMock(); req.user = clinic_staff_user
+        req = MagicMock()
+        req.user = clinic_staff_user
         assert not perm.has_permission(req, None)
 
     def test_is_super_admin_rejects_patient(self, patient_user):
-        from core.permissions import IsSuperAdmin
         from unittest.mock import MagicMock
+
+        from core.permissions import IsSuperAdmin
         perm = IsSuperAdmin()
-        req = MagicMock(); req.user = patient_user
+        req = MagicMock()
+        req.user = patient_user
         assert not perm.has_permission(req, None)
 
     def test_is_clinic_scoped_rejects_inactive_membership(self, db, clinic_admin_user, clinic):
-        from core.permissions import IsClinicScoped
-        from apps.accounts.models import ClinicUser
         from unittest.mock import MagicMock
+
+        from apps.accounts.models import ClinicUser
+        from core.permissions import IsClinicScoped
         ClinicUser.objects.filter(user=clinic_admin_user, clinic=clinic).update(is_active=False)
         perm = IsClinicScoped()
-        req = MagicMock(); req.user = clinic_admin_user; req.user._jwt_clinic_id = str(clinic.id)
+        req = MagicMock()
+        req.user = clinic_admin_user
+        req.user._jwt_clinic_id = str(clinic.id)
         assert not perm.has_permission(req, None)
 
 

@@ -12,7 +12,6 @@ import uuid
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
 
-
 # --- Choices ------------------------------------------------------------------
 
 class UserRole(models.TextChoices):
@@ -169,6 +168,7 @@ class PatientProfile(models.Model):
     milestone_20_awarded = models.BooleanField(default=False)
     milestone_35_awarded = models.BooleanField(default=False)
     milestone_50_awarded = models.BooleanField(default=False)
+    referred_by_code = models.CharField(max_length=30, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

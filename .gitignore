@@ -1,7 +1,10 @@
 .venv/
+venv/
+env/
 __pycache__/
 *.py[cod]
 *.sqlite3
+db.sqlite3
 .env
 .env.*
 !.env.example
@@ -14,8 +17,11 @@ mediafiles/
 staticfiles/
 
 .pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
 htmlcov/
+schema.yml
 
 *.log
 *.apk

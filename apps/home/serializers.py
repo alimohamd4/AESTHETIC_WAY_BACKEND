@@ -1,9 +1,9 @@
 from rest_framework import serializers
 
-from apps.treatments.models import Category
-from apps.offers.models import Offer
-from apps.media.models import FeaturedAd
 from apps.clinics.models import Clinic
+from apps.media.models import FeaturedAd
+from apps.offers.models import Offer
+from apps.treatments.models import Category
 
 
 class CategorySerializer(serializers.ModelSerializer):
